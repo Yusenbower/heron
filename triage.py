@@ -1,5 +1,6 @@
 # quick phishing checker for the mail export - L. Garcia, march 2025
-
+import email
+from email.utils import parseaddr
 import re
 import os
 import sys
@@ -20,11 +21,7 @@ BRANDS = ["paypal", "microsoft", "amazon"]
 
 URL_RE = re.compile(r"https?://[^\s\"'<>]+")
 IP_URL_RE = re.compile(r"https?://[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+")
-DOMAIN_RE = re.compile(r"@([a-zA-Z0-9.-]+)")
 
-def header(raw, name):
-    m = re.search(f"{name}: (.*)", raw)
-    return m.group(1) if m is not None else ""
 
 def keyword_score(low):
     return sum(W_KEYWORD for kw in KEYWORDS if kw in low)
@@ -53,19 +50,24 @@ def auth_score(low):
     return W_AUTH_FAIL if ("spf=fail" in low or "dmarc=fail" in low) else 0
 
 
+def domain_of(header_value):
+    _, addr = parseaddr(header_value)
+    _, sep, domain = addr.partition("@")
+    return domain.lower() if sep else ""
+
+
 def reply_to_score(frm, rt):
-    if not rt:
-        return 0
-    m1 = DOMAIN_RE.search(frm)
-    m2 = DOMAIN_RE.search(rt)
-    if m1 is not None and m2 is not None and m1.group(1) != m2.group(1):
+    d1 = domain_of(frm)
+    d2 = domain_of(rt)
+    if d1 and d2 and d1 != d2:
         return W_REPLY_TO_MISMATCH
     return 0
 
 
 def score_email(raw):
-    frm = header(raw, "From")
-    rt = header(raw, "Reply-To")
+    msg = email.message_from_string(raw)
+    frm = msg.get("From", "")
+    rt = msg.get("Reply-To", "")
     low = raw.lower()
     return (
         keyword_score(low)
