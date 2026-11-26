@@ -16,7 +16,9 @@ SUSPICIOUS_THRESHOLD = 3
 
 KEYWORDS = ["urgent", "verify", "suspended", "password", "expires", "act now",
             "congratulations", "winner", "claim", "immediately", "gift card"]
-
+def header(raw, name):
+    m = re.search(f"{name}: (.*)", raw)
+    return m.group(1) if m is not None else ""
 def check_mail(folder, flagged = None):
     if flagged is None:
         flagged = []
@@ -29,14 +31,8 @@ def check_mail(folder, flagged = None):
         with open(os.path.join(folder, fn), encoding="utf-8", errors="ignore") as f:
             raw = f.read()
         s = 0
-        try:
-            frm = re.search("From: (.*)", raw).group(1)
-        except:
-            frm = "?"
-        try:
-            subj = re.search("Subject: (.*)", raw).group(1)
-        except:
-            subj = "?"
+        frm = header(raw, "From") or "?"
+        subj = header(raw, "Subject") or "?"
         low = raw.lower()
         for kw in KEYWORDS:
             if kw in low:
@@ -58,14 +54,12 @@ def check_mail(folder, flagged = None):
         if "spf=fail" in low or "dmarc=fail" in low:
             s = s + W_AUTH_FAIL
         # reply-to different from from
-        try:
-            rt = re.search("Reply-To: (.*)", raw).group(1)
-            m1 = re.search("@([a-zA-Z0-9.-]+)", frm).group(1)
-            m2 = re.search("@([a-zA-Z0-9.-]+)", rt).group(1)
-            if m1 != m2:
+        rt = header(raw, "Reply-To")
+        if rt:
+            m1 = re.search(r"@([a-zA-Z0-9.-]+)", frm)
+            m2 = re.search(r"@([a-zA-Z0-9.-]+)", rt)
+            if m1 is not None and m2 is not None and m1.group(1) != m2.group(1):
                 s = s + W_REPLY_TO_MISMATCH
-        except:
-            pass
         scores[fn] = s
         if s >= PHISHING_THRESHOLD:
             verdicts.append((fn, "PHISHING", s))
@@ -86,4 +80,9 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("usage: python triage.py <folder-with-eml-files>", file=sys.stderr)
         sys.exit(2)
+    try:
+        check_mail(sys.argv[1])
+    except FileNotFoundError:
+        print(f"error: folder not found: {sys.argv[1]}", file=sys.stderr)
+        sys.exit(1)
     check_mail(sys.argv[1])
