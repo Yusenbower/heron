@@ -1,5 +1,5 @@
 # quick phishing checker for the mail export - L. Garcia, march 2025
-# TODO: make this nicer at some point
+
 import re
 import os
 import sys
@@ -23,7 +23,6 @@ def header(raw, name):
 def check_mail(folder, flagged = None):
     if flagged is None:
         flagged = []
-    scores = {}
     verdicts = []
     files = os.listdir(folder)
     for fn in files:
@@ -33,7 +32,7 @@ def check_mail(folder, flagged = None):
             raw = f.read()
         s = 0
         frm = header(raw, "From") or "?"
-        subj = header(raw, "Subject") or "?"
+
         low = raw.lower()
         for kw in KEYWORDS:
             if kw in low:
@@ -60,7 +59,7 @@ def check_mail(folder, flagged = None):
             m2 = re.search(r"@([a-zA-Z0-9.-]+)", rt)
             if m1 is not None and m2 is not None and m1.group(1) != m2.group(1):
                 s = s + W_REPLY_TO_MISMATCH
-        scores[fn] = s
+
         if s >= PHISHING_THRESHOLD:
             verdicts.append((fn, "PHISHING", s))
             flagged.append(fn)
@@ -68,7 +67,7 @@ def check_mail(folder, flagged = None):
             verdicts.append((fn, "suspicious", s))
         else:
             verdicts.append((fn, "ok", s))
-    print("checked", len(scores), "mails")
+    print("checked", len(verdicts), "mails")
     for v in verdicts:
         print(" ", v[0], "->", v[1], "(score", str(v[2]) + ")")
     with open("results.txt", "w", encoding="utf-8") as out:
