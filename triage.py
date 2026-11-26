@@ -20,9 +20,13 @@ BRANDS = ["paypal", "microsoft", "amazon"]
 def header(raw, name):
     m = re.search(f"{name}: (.*)", raw)
     return m.group(1) if m is not None else ""
-def check_mail(folder, flagged = None):
-    if flagged is None:
-        flagged = []
+def verdict_for(score):
+    if score >= PHISHING_THRESHOLD:
+        return "PHISHING"
+    if score >= SUSPICIOUS_THRESHOLD:
+        return "suspicious"
+    return "ok"
+def check_mail(folder):
     verdicts = []
     files = os.listdir(folder)
     for fn in files:
@@ -60,28 +64,26 @@ def check_mail(folder, flagged = None):
             if m1 is not None and m2 is not None and m1.group(1) != m2.group(1):
                 s = s + W_REPLY_TO_MISMATCH
 
-        if s >= PHISHING_THRESHOLD:
-            verdicts.append((fn, "PHISHING", s))
-            flagged.append(fn)
-        elif s >= SUSPICIOUS_THRESHOLD:
-            verdicts.append((fn, "suspicious", s))
-        else:
-            verdicts.append((fn, "ok", s))
-    print("checked", len(verdicts), "mails")
-    for v in verdicts:
-        print(" ", v[0], "->", v[1], "(score", str(v[2]) + ")")
+        verdicts.append((fn, verdict_for(s), s))
+
+    return verdicts
+
+def report(verdicts):
+    print(f"checked {len(verdicts)} mails")
+    for fn, verdict, score in verdicts:
+        print(f"  {fn} -> {verdict} (score {score})")
     with open("results.txt", "w", encoding="utf-8") as out:
         out.write(str(verdicts))
+    flagged = [fn for fn, verdict, _ in verdicts if verdict == "PHISHING"]
     print("flagged:", flagged)
-    return verdicts
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("usage: python triage.py <folder-with-eml-files>", file=sys.stderr)
         sys.exit(2)
     try:
-        check_mail(sys.argv[1])
+        verdicts = check_mail(sys.argv[1])
     except FileNotFoundError:
         print(f"error: folder not found: {sys.argv[1]}", file=sys.stderr)
         sys.exit(1)
-    check_mail(sys.argv[1])
+    report(verdicts)
