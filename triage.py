@@ -17,9 +17,64 @@ SUSPICIOUS_THRESHOLD = 3
 KEYWORDS = ["urgent", "verify", "suspended", "password", "expires", "act now",
             "congratulations", "winner", "claim", "immediately", "gift card"]
 BRANDS = ["paypal", "microsoft", "amazon"]
+
+URL_RE = re.compile(r"https?://[^\s\"'<>]+")
+IP_URL_RE = re.compile(r"https?://[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+")
+DOMAIN_RE = re.compile(r"@([a-zA-Z0-9.-]+)")
+
 def header(raw, name):
     m = re.search(f"{name}: (.*)", raw)
     return m.group(1) if m is not None else ""
+
+def keyword_score(low):
+    return sum(W_KEYWORD for kw in KEYWORDS if kw in low)
+
+
+def link_score(raw):
+    score = 0
+    for u in URL_RE.findall(raw):
+        if IP_URL_RE.match(u):
+            score += W_IP_LINK
+        if "xn--" in u:
+            score += W_PUNYCODE_LINK
+    return score
+
+
+def brand_score(frm):
+    frm_low = frm.lower()
+    return sum(
+        W_BRAND_MISMATCH
+        for brand in BRANDS
+        if brand in frm_low and f"{brand}.com" not in frm_low
+    )
+
+
+def auth_score(low):
+    return W_AUTH_FAIL if ("spf=fail" in low or "dmarc=fail" in low) else 0
+
+
+def reply_to_score(frm, rt):
+    if not rt:
+        return 0
+    m1 = DOMAIN_RE.search(frm)
+    m2 = DOMAIN_RE.search(rt)
+    if m1 is not None and m2 is not None and m1.group(1) != m2.group(1):
+        return W_REPLY_TO_MISMATCH
+    return 0
+
+
+def score_email(raw):
+    frm = header(raw, "From")
+    rt = header(raw, "Reply-To")
+    low = raw.lower()
+    return (
+        keyword_score(low)
+        + link_score(raw)
+        + brand_score(frm)
+        + auth_score(low)
+        + reply_to_score(frm, rt)
+    )
+
 def verdict_for(score):
     if score >= PHISHING_THRESHOLD:
         return "PHISHING"
@@ -28,44 +83,13 @@ def verdict_for(score):
     return "ok"
 def check_mail(folder):
     verdicts = []
-    files = os.listdir(folder)
-    for fn in files:
+    for fn in os.listdir(folder):
         if not fn.endswith(".eml"):
             continue
         with open(os.path.join(folder, fn), encoding="utf-8", errors="ignore") as f:
             raw = f.read()
-        s = 0
-        frm = header(raw, "From") or "?"
-
-        low = raw.lower()
-        for kw in KEYWORDS:
-            if kw in low:
-                s = s + W_KEYWORD
-        # links that look bad
-        urls = re.findall("https?://[^\\s\"'<>]+", raw)
-        for u in urls:
-            if re.match("https?://[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+", u):
-                s = s + W_IP_LINK
-            if "xn--" in u:
-                s = s + W_PUNYCODE_LINK
-        # sender says paypal/microsoft/amazon but domain is weird
-        # sender mentions a known brand but uses another domain
-        frm_low = frm.lower()
-        for brand in BRANDS:
-            if brand in frm_low and f"{brand}.com" not in frm_low:
-                s = s + W_BRAND_MISMATCH
-        if "spf=fail" in low or "dmarc=fail" in low:
-            s = s + W_AUTH_FAIL
-        # reply-to different from from
-        rt = header(raw, "Reply-To")
-        if rt:
-            m1 = re.search(r"@([a-zA-Z0-9.-]+)", frm)
-            m2 = re.search(r"@([a-zA-Z0-9.-]+)", rt)
-            if m1 is not None and m2 is not None and m1.group(1) != m2.group(1):
-                s = s + W_REPLY_TO_MISMATCH
-
-        verdicts.append((fn, verdict_for(s), s))
-
+        score = score_email(raw)
+        verdicts.append((fn, verdict_for(score), score))
     return verdicts
 
 def report(verdicts):
