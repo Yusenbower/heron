@@ -16,6 +16,7 @@ SUSPICIOUS_THRESHOLD = 3
 
 KEYWORDS = ["urgent", "verify", "suspended", "password", "expires", "act now",
             "congratulations", "winner", "claim", "immediately", "gift card"]
+BRANDS = ["paypal", "microsoft", "amazon"]
 def header(raw, name):
     m = re.search(f"{name}: (.*)", raw)
     return m.group(1) if m is not None else ""
@@ -45,12 +46,11 @@ def check_mail(folder, flagged = None):
             if "xn--" in u:
                 s = s + W_PUNYCODE_LINK
         # sender says paypal/microsoft/amazon but domain is weird
-        if "paypal" in frm.lower() and "paypal.com" not in frm.lower():
-            s = s + W_BRAND_MISMATCH
-        if "microsoft" in frm.lower() and "microsoft.com" not in frm.lower():
-            s = s + W_BRAND_MISMATCH
-        if "amazon" in frm.lower() and "amazon.com" not in frm.lower():
-            s = s + W_BRAND_MISMATCH
+        # sender mentions a known brand but uses another domain
+        frm_low = frm.lower()
+        for brand in BRANDS:
+            if brand in frm_low and f"{brand}.com" not in frm_low:
+                s = s + W_BRAND_MISMATCH
         if "spf=fail" in low or "dmarc=fail" in low:
             s = s + W_AUTH_FAIL
         # reply-to different from from
