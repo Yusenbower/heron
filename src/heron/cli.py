@@ -103,13 +103,15 @@ def report(verdicts):
     flagged = [fn for fn, verdict, _ in verdicts if verdict == "PHISHING"]
     print("flagged:", flagged)
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("usage: python triage.py <folder-with-eml-files>", file=sys.stderr)
-        sys.exit(2)
+def main(argv: list[str] | None = None) -> int:
+    """Run the triage on the folder given on the command line; return the exit code."""
+    args = sys.argv[1:] if argv is None else argv
+    if len(args) != 1:
+        print("usage: python -m heron <folder-with-eml-files>", file=sys.stderr)
+        return 2
     try:
-        verdicts = check_mail(sys.argv[1])
+        report(check_mail(args[0]))
     except FileNotFoundError:
-        print(f"error: folder not found: {sys.argv[1]}", file=sys.stderr)
-        sys.exit(1)
-    report(verdicts)
+        print("error: no such folder:", args[0], file=sys.stderr)
+        return 2
+    return 0
