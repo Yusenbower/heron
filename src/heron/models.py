@@ -1,6 +1,7 @@
 """The data types of the triage domain."""
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 
 @dataclass(frozen=True)
@@ -15,10 +16,19 @@ class ParsedEmail:
     text: str
     links: tuple[str, ...]
 
+
+class Verdict(StrEnum):
+    """The outcome of the triage, from harmless to dangerous."""
+
+    BENIGN = "benign"
+    SUSPICIOUS = "suspicious"
+    PHISHING = "phishing"
+
+
 @dataclass(frozen=True)
 class TriageResult:
     """The verdict on one message, with its score."""
 
     email_id: str
     score: int
-    verdict: str
+    verdict: Verdict

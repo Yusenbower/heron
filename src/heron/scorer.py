@@ -1,7 +1,7 @@
 """Combine the indicator points into a score and a verdict."""
 
 from heron.features import ALL_CHECKS
-from heron.models import ParsedEmail, TriageResult
+from heron.models import ParsedEmail, TriageResult, Verdict
 
 PHISHING_THRESHOLD = 5
 SUSPICIOUS_THRESHOLD = 3
@@ -13,10 +13,10 @@ def triage(email: ParsedEmail) -> TriageResult:
     return TriageResult(email.email_id, score, verdict_for(score))
 
 
-def verdict_for(score: int) -> str:
+def verdict_for(score: int) -> Verdict:
     """Map a score to a verdict."""
     if score >= PHISHING_THRESHOLD:
-        return "PHISHING"
+        return Verdict.PHISHING
     if score >= SUSPICIOUS_THRESHOLD:
-        return "suspicious"
-    return "ok"
+        return Verdict.SUSPICIOUS
+    return Verdict.BENIGN

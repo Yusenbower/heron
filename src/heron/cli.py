@@ -3,6 +3,7 @@
 import os
 import sys
 
+from heron.models import Verdict
 from heron.parser import parse_eml
 from heron.scorer import triage
 
@@ -27,7 +28,7 @@ def report(verdicts):
         print(f"  {fn} -> {verdict} (score {score})")
     with open("results.txt", "w", encoding="utf-8") as out:
         out.write(str(verdicts))
-    flagged = [fn for fn, verdict, _ in verdicts if verdict == "PHISHING"]
+    flagged = [fn for fn, verdict, _ in verdicts if verdict == Verdict.PHISHING]
     print("flagged:", flagged)
 
 
