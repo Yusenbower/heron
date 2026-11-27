@@ -2,7 +2,7 @@
 
 import re
 
-from heron.parser import sender_domain
+from heron.models import ParsedEmail
 
 W_KEYWORD = 1
 W_IP_LINK = 3
@@ -17,20 +17,18 @@ KEYWORDS = [
     "congratulations", "winner", "claim", "immediately", "gift card",
 ]
 
-_URL_RE = re.compile(r"https?://[^\s\"'<>]+")
 _IP_URL_RE = re.compile(r"https?://[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+")
 
 
-def keyword_score(raw):
+def keyword_score(email: ParsedEmail) -> int:
     """One point for each pressure keyword found anywhere in the message."""
-    low = raw.lower()
-    return sum(W_KEYWORD for kw in KEYWORDS if kw in low)
+    return sum(W_KEYWORD for kw in KEYWORDS if kw in email.text)
 
 
-def link_score(raw):
+def link_score(email: ParsedEmail) -> int:
     """Points for links to a bare IP address or to a punycode domain."""
     s = 0
-    for url in _URL_RE.findall(raw):
+    for url in email.links:
         if _IP_URL_RE.match(url):
             s = s + W_IP_LINK
         if "xn--" in url:
@@ -38,9 +36,9 @@ def link_score(raw):
     return s
 
 
-def brand_score(frm):
+def brand_score(email: ParsedEmail) -> int:
     """Points when the sender name claims a brand but the address is elsewhere."""
-    low = frm.lower()
+    low = email.sender.lower()
     return sum(
         W_BRAND_MISMATCH
         for brand in BRANDS
@@ -48,18 +46,16 @@ def brand_score(frm):
     )
 
 
-def auth_score(raw):
+def auth_score(email: ParsedEmail) -> int:
     """Points when SPF or DMARC failed."""
-    low = raw.lower()
-    if "spf=fail" in low or "dmarc=fail" in low:
+    if "spf=fail" in email.auth_results or "dmarc=fail" in email.auth_results:
         return W_AUTH_FAIL
     return 0
 
 
-def reply_to_score(frm, reply_to):
+def reply_to_score(email: ParsedEmail) -> int:
     """Points when replies go to a different domain than the sender's."""
-    from_domain = sender_domain(frm)
-    reply_domain = sender_domain(reply_to)
+    from_domain, reply_domain = email.from_domain, email.reply_to_domain
     if from_domain and reply_domain and from_domain != reply_domain:
         return W_REPLY_TO_MISMATCH
     return 0

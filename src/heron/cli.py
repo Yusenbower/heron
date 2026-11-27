@@ -3,6 +3,7 @@
 import os
 import sys
 
+from heron.parser import parse_eml
 from heron.scorer import score_email, verdict_for
 
 
@@ -14,7 +15,7 @@ def check_mail(folder):
             continue
         with open(os.path.join(folder, fn), encoding="utf-8", errors="ignore") as f:
             raw = f.read()
-        score = score_email(raw)
+        score = score_email(parse_eml(raw, fn))
         verdicts.append((fn, verdict_for(score), score))
     return verdicts
 

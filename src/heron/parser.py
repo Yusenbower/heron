@@ -9,7 +9,7 @@ from heron.models import ParsedEmail
 _URL_RE = re.compile("https?://[^\\s\"'<>]+")
 
 
-def sender_domain(header_value: str) -> str | None:
+def _domain(header_value: str) -> str | None:
     """Return the domain of the address in a From/Reply-To value, or None."""
     _, address = parseaddr(header_value)
     if "@" not in address:
@@ -24,8 +24,8 @@ def parse_eml(raw: str, email_id: str) -> ParsedEmail:
     return ParsedEmail(
         email_id=email_id,
         sender=sender,
-        from_domain=sender_domain(sender),
-        reply_to_domain=sender_domain(str(msg.get("Reply-To", ""))),
+        from_domain=_domain(sender),
+        reply_to_domain=_domain(str(msg.get("Reply-To", ""))),
         auth_results=str(msg.get("Authentication-Results", "")).lower(),
         text=raw.lower(),
         links=tuple(_URL_RE.findall(raw)),
