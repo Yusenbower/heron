@@ -1,8 +1,10 @@
-"""Command-line interface: ``python -m heron <folder>``."""
+"""Command-line interface: ``python -m heron <path>``."""
 
 import argparse
-import os
+import json
 import sys
+from dataclasses import asdict
+from pathlib import Path
 
 from heron.models import TriageResult
 from heron.parser import parse_eml
@@ -12,18 +14,19 @@ from heron.scorer import triage
 def build_parser() -> argparse.ArgumentParser:
     """Return the parser of the command-line arguments."""
     parser = argparse.ArgumentParser(prog="heron", description="Triage phishing emails.")
-    parser.add_argument("folder", help="a folder of .eml files")
+    parser.add_argument("path", type=Path, help="an .eml file or a folder of .eml files")
+    parser.add_argument("--json", action="store_true", help="machine-readable output")
     return parser
 
-def check_mail(folder: str) -> list[TriageResult]:
-    """Triage every .eml file in folder, in name order."""
+
+def check_mail(path: Path) -> list[TriageResult]:
+    """Triage one .eml file, or every .eml file in a folder, in name order."""
+    files = sorted(path.glob("*.eml")) if path.is_dir() else [path]
     results = []
-    for fn in sorted(os.listdir(folder)):
-        if not fn.endswith(".eml"):
-            continue
-        with open(os.path.join(folder, fn), encoding="utf-8", errors="ignore") as f:
+    for file in files:
+        with open(file, encoding="utf-8", errors="ignore") as f:
             raw = f.read()
-        results.append(triage(parse_eml(raw, fn)))
+        results.append(triage(parse_eml(raw, file.name)))
     return results
 
 
@@ -34,11 +37,15 @@ def report(results: list[TriageResult]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the triage on the folder given on the command line; return the exit code."""
+    """Run the triage on the path given on the command line; return the exit code."""
     args = build_parser().parse_args(argv)
     try:
-        report(check_mail(args.folder))
+        results = check_mail(args.path)
     except FileNotFoundError:
-        print("error: no such folder:", args.folder, file=sys.stderr)
+        print("error: no such file or folder:", args.path, file=sys.stderr)
         return 2
+    if args.json:
+        print(json.dumps([asdict(r) for r in results], indent=2))
+    else:
+        report(results)
     return 0
