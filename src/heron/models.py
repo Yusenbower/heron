@@ -14,3 +14,11 @@ class ParsedEmail:
     auth_results: str
     text: str
     links: tuple[str, ...]
+
+@dataclass(frozen=True)
+class TriageResult:
+    """The verdict on one message, with its score."""
+
+    email_id: str
+    score: int
+    verdict: str
