@@ -2,6 +2,8 @@
 
 import re
 
+from collections.abc import Callable
+
 from heron.models import ParsedEmail
 
 W_KEYWORD = 1
@@ -59,3 +61,11 @@ def reply_to_score(email: ParsedEmail) -> int:
     if from_domain and reply_domain and from_domain != reply_domain:
         return W_REPLY_TO_MISMATCH
     return 0
+
+ALL_CHECKS: tuple[Callable[[ParsedEmail], int], ...] = (
+    keyword_score,
+    link_score,
+    brand_score,
+    auth_score,
+    reply_to_score,
+)
