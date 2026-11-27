@@ -3,33 +3,27 @@
 import os
 import sys
 
-from heron.models import Verdict
+from heron.models import TriageResult
 from heron.parser import parse_eml
 from heron.scorer import triage
 
 
-def check_mail(folder):
-    """Score every .eml file in folder; return (file name, verdict, score) tuples."""
-    verdicts = []
-    for fn in os.listdir(folder):
+def check_mail(folder: str) -> list[TriageResult]:
+    """Triage every .eml file in folder, in name order."""
+    results = []
+    for fn in sorted(os.listdir(folder)):
         if not fn.endswith(".eml"):
             continue
         with open(os.path.join(folder, fn), encoding="utf-8", errors="ignore") as f:
             raw = f.read()
-        result = triage(parse_eml(raw, fn))
-        verdicts.append((fn, result.verdict, result.score))
-    return verdicts
+        results.append(triage(parse_eml(raw, fn)))
+    return results
 
 
-def report(verdicts):
-    """Print the verdicts and save them to results.txt."""
-    print(f"checked {len(verdicts)} mails")
-    for fn, verdict, score in verdicts:
-        print(f"  {fn} -> {verdict} (score {score})")
-    with open("results.txt", "w", encoding="utf-8") as out:
-        out.write(str(verdicts))
-    flagged = [fn for fn, verdict, _ in verdicts if verdict == Verdict.PHISHING]
-    print("flagged:", flagged)
+def report(results: list[TriageResult]) -> None:
+    """A line for each email, with its verdict and its score."""
+    for r in results:
+        print(f"{r.email_id:<28} {r.verdict:<10} score={r.score}")
 
 
 def main(argv: list[str] | None = None) -> int:
